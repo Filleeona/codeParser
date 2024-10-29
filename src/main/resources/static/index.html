@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Executor</title>
+    <style>
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 8px;
+        }
+        #output {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #333;
+            background-color: #f4f4f4;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+<h1>Code Executor</h1>
+
+<label for="codeName">Название:</label>
+<input type="text" id="codeName" required><br><br>
+
+<label for="codeContent">Код (JS):</label><br>
+<textarea id="codeContent" rows="10" cols="30"></textarea><br><br>
+
+<button onclick="saveCode()">Сохранить</button>
+<button onclick="executeCode()">Выполнить</button>
+
+<h2>Результат выполнения:</h2>
+<div id="output"></div>
+
+<h2>Сохранённые коды:</h2>
+<table id="codesTable">
+    <thead>
+    <tr>
+        <th>Название</th>
+        <th>Время сохранения</th>
+        <th>Действия</th>
+    </tr>
+    </thead>
+    <tbody id="codesTableBody"></tbody>
+</table>
+
+<script>
+    async function saveCode() {
+        const codeName = document.getElementById("codeName").value;
+        const codeContent = document.getElementById("codeContent").value;
+
+        if (!codeName || !codeContent) {
+            alert("Пожалуйста, заполните все поля");
+            return;
+        }
+
+        const response = await fetch('/api/saveCode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: codeName, code: codeContent })
+        });
+
+        const codes = await response.json();
+        updateTable(codes);
+    }
+
+    async function loadCodes() {
+        const response = await fetch('/api/getCodes');
+        const codes = await response.json();
+        updateTable(codes);
+    }
+
+    function updateTable(codes) {
+        const tableBody = document.getElementById("codesTableBody");
+        tableBody.innerHTML = '';
+        codes.forEach((item, index) => {
+            const row = document.createElement("tr");
+
+            // Создаем ячейку с кликабельным названием
+            const nameCell = document.createElement("td");
+            const nameLink = document.createElement("a");
+            nameLink.textContent = item.name;
+            nameLink.href = "#";
+            nameLink.onclick = () => viewCode(item.code); // Обработчик клика
+            nameCell.appendChild(nameLink); // Добавляем ссылку в ячейку
+
+            const timestampCell = document.createElement("td");
+            timestampCell.textContent = item.timestamp; // Сохраняем время сохранения
+
+            const actionCell = document.createElement("td");
+            const deleteButton = document.createElement("button");
+            deleteButton.textContent = "Удалить";
+            deleteButton.onclick = () => deleteCode(index);
+            actionCell.appendChild(deleteButton);
+
+            row.appendChild(nameCell);
+            row.appendChild(timestampCell);
+            row.appendChild(actionCell); // Добавляем кнопку удаления
+            tableBody.appendChild(row);
+        });
+    }
+
+    function viewCode(code) {
+        document.getElementById("codeContent").value = code; // Отображаем код в текстовом поле
+    }
+
+    async function deleteCode(index) {
+        const response = await fetch(`/api/deleteCode/${index}`, {
+            method: 'DELETE'
+        });
+        const codes = await response.json();
+        updateTable(codes);
+    }
+
+    async function executeCode() {
+        const codeContent = document.getElementById("codeContent").value;
+        const outputDiv = document.getElementById("output");
+
+        try {
+            const response = await fetch('/api/executeCode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain' },
+                body: codeContent // Отправляем просто код
+            });
+
+            const result = await response.text();
+            outputDiv.innerText = result; // Выводим результат выполнения
+        } catch (error) {
+            outputDiv.innerText = 'Ошибка при выполнении запроса: ' + error.message;
+        }
+    }
+
+    // Загружаем коды при загрузке страницы
+    window.onload = loadCodes;
+</script>
+</body>
+</html>
